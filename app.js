@@ -1,270 +1,188 @@
 // ============================================
-// Focus Flow - Anti-Procrastination Companion
-// Main Application JavaScript
+// Focus Flow - Application JavaScript
 // ============================================
 
-// ============================================
-// State Management (Simulating Database)
-// ============================================
-const AppState = {
-    tasks: JSON.parse(localStorage.getItem('focusflow_tasks')) || [],
-    sessions: JSON.parse(localStorage.getItem('focusflow_sessions')) || [],
-    currentTask: null,
-    timerDuration: 25, // minutes
-    timerRemaining: 25 * 60, // seconds
-    timerRunning: false,
-    timerInterval: null,
-    currentQuote: {
-        text: "The secret of getting ahead is getting started.",
-        author: "Mark Twain"
-    }
+// Ambient Sound URLs
+const SOUNDS = {
+    none: null,
+    rain: 'https://cdn.pixabay.com/audio/2022/05/16/audio_1b71c9e9a0.mp3',
+    ocean: 'https://cdn.pixabay.com/audio/2022/06/07/audio_b9bd4170e4.mp3',
+    forest: 'https://cdn.pixabay.com/audio/2022/08/31/audio_419263fc12.mp3',
+    cafe: 'https://cdn.pixabay.com/audio/2022/10/18/audio_e8f5d51e49.mp3',
+    night: 'https://cdn.pixabay.com/audio/2022/08/02/audio_884fe92c21.mp3',
+    fireplace: 'https://cdn.pixabay.com/audio/2021/10/08/audio_4dbb265f14.mp3',
+    lofi: 'https://cdn.pixabay.com/audio/2022/11/22/audio_733b3d71ce.mp3'
 };
 
-// Save state to localStorage
-function saveState() {
-    localStorage.setItem('focusflow_tasks', JSON.stringify(AppState.tasks));
-    localStorage.setItem('focusflow_sessions', JSON.stringify(AppState.sessions));
-}
-
-// ============================================
-// DOM Elements
-// ============================================
-const elements = {
-    // Pages
-    mainContent: document.getElementById('mainContent'),
-    focusPage: document.getElementById('focusPage'),
-    tasksPage: document.getElementById('tasksPage'),
-    dashboardPage: document.getElementById('dashboardPage'),
-    
-    // Header
-    greeting: document.getElementById('greeting'),
-    
-    // Timer
-    timerDisplay: document.getElementById('timerDisplay'),
-    progressRing: document.getElementById('progressRing'),
-    currentTaskName: document.getElementById('currentTaskName'),
-    startPauseBtn: document.getElementById('startPauseBtn'),
-    startPauseText: document.getElementById('startPauseText'),
-    resetBtn: document.getElementById('resetBtn'),
-    skipBtn: document.getElementById('skipBtn'),
-    quoteText: document.getElementById('quoteText'),
-    quoteAuthor: document.getElementById('quoteAuthor'),
-    
-    // Tasks
-    tasksList: document.getElementById('tasksList'),
-    addTaskBtn: document.getElementById('addTaskBtn'),
-    filterBtns: document.querySelectorAll('.filter-btn'),
-    
-    // Dashboard
-    totalSessions: document.getElementById('totalSessions'),
-    totalFocusTime: document.getElementById('totalFocusTime'),
-    tasksCompleted: document.getElementById('tasksCompleted'),
-    currentStreak: document.getElementById('currentStreak'),
-    sessionsList: document.getElementById('sessionsList'),
-    
-    // Modals
-    addTaskModal: document.getElementById('addTaskModal'),
-    closeModal: document.getElementById('closeModal'),
-    taskForm: document.getElementById('taskForm'),
-    taskTitle: document.getElementById('taskTitle'),
-    sessionCompleteModal: document.getElementById('sessionCompleteModal'),
-    sessionSummary: document.getElementById('sessionSummary'),
-    modalQuote: document.getElementById('modalQuote'),
-    modalQuoteAuthor: document.getElementById('modalQuoteAuthor'),
-    closeSessionModal: document.getElementById('closeSessionModal'),
-    
-    // Navigation
-    navBtns: document.querySelectorAll('.nav-btn'),
-    quickActions: document.querySelectorAll('.action-card')
+// Application State
+const state = {
+    duration: 25,
+    remaining: 25 * 60,
+    running: false,
+    interval: null,
+    mode: 'focus',
+    sessionStartTime: null,
+    worldTime: null,
+    timezone: null,
+    currentQuote: { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+    sessions: JSON.parse(localStorage.getItem('focusflow_sessions') || '[]'),
+    currentTheme: localStorage.getItem('focusflow_theme') || 'default',
+    currentSound: 'none',
+    audio: null,
+    volume: parseFloat(localStorage.getItem('focusflow_volume') || '0.5'),
+    isPlaying: false
 };
 
+let weeklyChart, modeChart;
+
 // ============================================
-// Initialization
+// Ambient Effects
 // ============================================
-function init() {
-    updateGreeting();
-    updateDayIndicator();
-    renderTasks();
-    updateDashboard();
-    initCharts();
-    setupEventListeners();
-    fetchRandomQuote();
+function generateEffects() {
+    // Rain drops
+    const rain = document.getElementById('rainContainer');
+    for (let i = 0; i < 100; i++) {
+        const drop = document.createElement('div');
+        drop.className = 'rain-drop';
+        drop.style.left = Math.random() * 100 + '%';
+        drop.style.animationDuration = (0.5 + Math.random() * 0.5) + 's';
+        drop.style.animationDelay = Math.random() * 2 + 's';
+        rain.appendChild(drop);
+    }
     
-    // Add demo data if empty
-    if (AppState.tasks.length === 0) {
-        addDemoData();
+    // Stars
+    const stars = document.getElementById('starsContainer');
+    for (let i = 0; i < 50; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.animationDelay = Math.random() * 3 + 's';
+        stars.appendChild(star);
+    }
+    
+    // Fireflies
+    const fireflies = document.getElementById('firefliesContainer');
+    for (let i = 0; i < 15; i++) {
+        const fly = document.createElement('div');
+        fly.className = 'firefly';
+        fly.style.left = Math.random() * 100 + '%';
+        fly.style.top = 30 + Math.random() * 50 + '%';
+        fly.style.animationDelay = Math.random() * 8 + 's';
+        fireflies.appendChild(fly);
+    }
+    
+    // Fire sparks
+    const sparks = document.getElementById('sparksContainer');
+    for (let i = 0; i < 20; i++) {
+        const spark = document.createElement('div');
+        spark.className = 'spark';
+        spark.style.left = 30 + Math.random() * 40 + '%';
+        spark.style.animationDelay = Math.random() * 4 + 's';
+        sparks.appendChild(spark);
     }
 }
 
-function addDemoData() {
-    const demoTasks = [
-        { id: generateId(), title: 'Complete project documentation', category: 'Work', status: 'active', duration: 25, createdAt: new Date().toISOString() },
-        { id: generateId(), title: 'Study JavaScript patterns', category: 'Study', status: 'active', duration: 45, createdAt: new Date().toISOString() },
-        { id: generateId(), title: 'Morning meditation', category: 'Personal', status: 'completed', duration: 15, createdAt: new Date().toISOString() },
-        { id: generateId(), title: 'Review pull requests', category: 'Work', status: 'active', duration: 25, createdAt: new Date().toISOString() },
-    ];
-    
-    const demoSessions = [
-        {
-            id: generateId(),
-            taskId: demoTasks[0].id,
-            taskTitle: demoTasks[0].title,
-            category: 'Work',
-            startTime: new Date(Date.now() - 86400000).toISOString(),
-            endTime: new Date(Date.now() - 86400000 + 1500000).toISOString(),
-            durationMinutes: 25,
-            motivationalMessage: "Success is not final, failure is not fatal.",
-            status: 'completed'
-        },
-        {
-            id: generateId(),
-            taskId: demoTasks[1].id,
-            taskTitle: demoTasks[1].title,
-            category: 'Study',
-            startTime: new Date(Date.now() - 172800000).toISOString(),
-            endTime: new Date(Date.now() - 172800000 + 2700000).toISOString(),
-            durationMinutes: 45,
-            motivationalMessage: "The only way to do great work is to love what you do.",
-            status: 'completed'
-        },
-        {
-            id: generateId(),
-            taskId: demoTasks[2].id,
-            taskTitle: demoTasks[2].title,
-            category: 'Personal',
-            startTime: new Date(Date.now() - 259200000).toISOString(),
-            endTime: new Date(Date.now() - 259200000 + 900000).toISOString(),
-            durationMinutes: 15,
-            motivationalMessage: "Peace comes from within.",
-            status: 'completed'
-        }
-    ];
-    
-    AppState.tasks = demoTasks;
-    AppState.sessions = demoSessions;
-    saveState();
-    renderTasks();
-    updateDashboard();
+// ============================================
+// Theme & Sound
+// ============================================
+function setTheme(theme) {
+    document.body.className = 'theme-' + theme;
+    state.currentTheme = theme;
+    localStorage.setItem('focusflow_theme', theme);
 }
 
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
-// ============================================
-// Event Listeners
-// ============================================
-function setupEventListeners() {
-    // Navigation
-    elements.navBtns.forEach(btn => {
-        btn.addEventListener('click', () => navigateToPage(btn.dataset.page));
-    });
-    
-    // Quick Actions
-    elements.quickActions.forEach(card => {
-        card.addEventListener('click', () => {
-            if (card.id === 'focusTimerCard') {
-                navigateToPage('focusPage');
-            }
-        });
-    });
-    
-    // Timer Controls
-    elements.startPauseBtn.addEventListener('click', toggleTimer);
-    elements.resetBtn.addEventListener('click', resetTimer);
-    elements.skipBtn.addEventListener('click', skipTimer);
-    
-    // Task Modal
-    elements.addTaskBtn.addEventListener('click', () => openModal(elements.addTaskModal));
-    elements.closeModal.addEventListener('click', () => closeModalHandler(elements.addTaskModal));
-    elements.addTaskModal.addEventListener('click', (e) => {
-        if (e.target === elements.addTaskModal) closeModalHandler(elements.addTaskModal);
-    });
-    
-    // Task Form
-    elements.taskForm.addEventListener('submit', handleTaskSubmit);
-    
-    // Category Selection
-    document.querySelectorAll('.category-option').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.category-option').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        });
-    });
-    
-    // Duration Selection
-    document.querySelectorAll('.duration-option').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.duration-option').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        });
-    });
-    
-    // Filter Buttons
-    elements.filterBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            elements.filterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            renderTasks(btn.dataset.category);
-        });
-    });
-    
-    // Session Complete Modal
-    elements.closeSessionModal.addEventListener('click', () => {
-        closeModalHandler(elements.sessionCompleteModal);
-    });
-    elements.sessionCompleteModal.addEventListener('click', (e) => {
-        if (e.target === elements.sessionCompleteModal) {
-            closeModalHandler(elements.sessionCompleteModal);
-        }
-    });
-}
-
-// ============================================
-// Navigation
-// ============================================
-function navigateToPage(pageId) {
-    // Update pages
-    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-    document.getElementById(pageId).classList.add('active');
-    
-    // Update nav buttons
-    elements.navBtns.forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`[data-page="${pageId}"]`)?.classList.add('active');
-    
-    // Update charts if going to dashboard
-    if (pageId === 'dashboardPage') {
-        updateDashboard();
-        updateCharts();
+function playSound(key) {
+    if (state.audio) {
+        state.audio.pause();
+        state.audio = null;
     }
+    state.currentSound = key;
+    
+    // Update trigger button display
+    const activeOption = document.querySelector(`.ambient-option[data-sound="${key}"]`);
+    if (activeOption) {
+        document.getElementById('ambientIcon').textContent = activeOption.querySelector('.ambient-option-icon').textContent;
+        document.getElementById('ambientLabel').textContent = activeOption.querySelector('.ambient-option-label').textContent;
+    }
+    
+    if (key === 'none' || !SOUNDS[key]) {
+        state.isPlaying = false;
+        document.getElementById('volumeRow').style.display = 'none';
+        document.getElementById('ambientTrigger').classList.remove('playing');
+        return;
+    }
+    
+    state.audio = new Audio(SOUNDS[key]);
+    state.audio.loop = true;
+    state.audio.volume = state.volume;
+    state.audio.play().catch(() => {});
+    state.isPlaying = true;
+    document.getElementById('volumeRow').style.display = 'flex';
+    document.getElementById('ambientTrigger').classList.add('playing');
+    localStorage.setItem('focusflow_sound', key);
+}
+
+function toggleAmbientPanel(e) {
+    e.stopPropagation();
+    const panel = document.getElementById('ambientPanel');
+    panel.classList.toggle('open');
+}
+
+function closeAmbientPanel() {
+    document.getElementById('ambientPanel').classList.remove('open');
+}
+
+// ============================================
+// Time & World Time API
+// ============================================
+async function fetchWorldTime() {
+    try {
+        const r = await fetch('https://worldtimeapi.org/api/ip');
+        const d = await r.json();
+        state.worldTime = new Date(d.datetime);
+        state.timezone = d.abbreviation;
+        document.getElementById('timezone').textContent = d.abbreviation;
+    } catch {
+        state.worldTime = new Date();
+        document.getElementById('timezone').textContent = 'Local';
+    }
+    updateTimeDisplay();
+}
+
+function updateTimeDisplay() {
+    const now = state.worldTime || new Date();
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+}
+
+function updateGreeting() {
+    const h = (state.worldTime || new Date()).getHours();
+    document.getElementById('greeting').textContent = 
+        h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : h < 21 ? 'Evening' : 'Night';
+}
+
+function updateDayIndicator() {
+    const d = (state.worldTime || new Date()).getDay();
+    document.querySelectorAll('.week-indicator .day').forEach(el => 
+        el.classList.toggle('active', +el.dataset.day === d)
+    );
 }
 
 // ============================================
 // Timer Functions
 // ============================================
-function toggleTimer() {
-    if (AppState.timerRunning) {
-        pauseTimer();
-    } else {
-        startTimer();
-    }
-}
-
 function startTimer() {
-    if (!AppState.currentTask) {
-        // If no task selected, show tasks page
-        showNotification('Please select a task first');
-        navigateToPage('tasksPage');
-        return;
-    }
-    
-    AppState.timerRunning = true;
-    AppState.sessionStartTime = new Date();
-    updateTimerUI();
-    
-    AppState.timerInterval = setInterval(() => {
-        if (AppState.timerRemaining > 0) {
-            AppState.timerRemaining--;
+    state.running = true;
+    state.sessionStartTime = state.worldTime || new Date();
+    updateButtonUI();
+    state.interval = setInterval(() => {
+        if (state.remaining > 0) {
+            state.remaining--;
             updateTimerDisplay();
         } else {
             completeSession();
@@ -273,510 +191,434 @@ function startTimer() {
 }
 
 function pauseTimer() {
-    AppState.timerRunning = false;
-    clearInterval(AppState.timerInterval);
-    updateTimerUI();
+    state.running = false;
+    clearInterval(state.interval);
+    updateButtonUI();
 }
 
 function resetTimer() {
     pauseTimer();
-    AppState.timerRemaining = AppState.timerDuration * 60;
+    state.remaining = state.duration * 60;
+    state.sessionStartTime = null;
+    document.getElementById('timerRing').classList.remove('complete');
     updateTimerDisplay();
-}
-
-function skipTimer() {
-    if (AppState.timerRunning || AppState.timerRemaining < AppState.timerDuration * 60) {
-        completeSession();
-    }
-}
-
-function updateTimerDisplay() {
-    const minutes = Math.floor(AppState.timerRemaining / 60);
-    const seconds = AppState.timerRemaining % 60;
-    elements.timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    
-    // Update progress ring
-    const totalSeconds = AppState.timerDuration * 60;
-    const progress = (totalSeconds - AppState.timerRemaining) / totalSeconds;
-    const circumference = 2 * Math.PI * 90;
-    const offset = circumference * (1 - progress);
-    elements.progressRing.style.strokeDashoffset = offset;
-}
-
-function updateTimerUI() {
-    const playIcon = elements.startPauseBtn.querySelector('.play-icon');
-    const pauseIcon = elements.startPauseBtn.querySelector('.pause-icon');
-    
-    if (AppState.timerRunning) {
-        playIcon.classList.add('hidden');
-        pauseIcon.classList.remove('hidden');
-        elements.startPauseText.textContent = 'Pause';
-        elements.startPauseBtn.classList.add('active');
-    } else {
-        playIcon.classList.remove('hidden');
-        pauseIcon.classList.add('hidden');
-        elements.startPauseText.textContent = 'Start';
-        elements.startPauseBtn.classList.remove('active');
-    }
 }
 
 async function completeSession() {
     pauseTimer();
-    
-    const endTime = new Date();
-    const startTime = AppState.sessionStartTime || new Date(endTime - (AppState.timerDuration * 60 * 1000));
-    const actualDuration = Math.round((AppState.timerDuration * 60 - AppState.timerRemaining) / 60);
-    
-    // Fetch a new motivational quote
-    await fetchRandomQuote();
-    
-    // Create session record
+    document.getElementById('timerRing').classList.add('complete');
+    await fetchWorldTime();
+    const end = state.worldTime || new Date();
+    const start = state.sessionStartTime || new Date(end - state.duration * 60000);
+    await fetchQuote();
+
     const session = {
-        id: generateId(),
-        taskId: AppState.currentTask?.id,
-        taskTitle: AppState.currentTask?.title || 'Focus Session',
-        category: AppState.currentTask?.category || 'Personal',
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        durationMinutes: actualDuration > 0 ? actualDuration : AppState.timerDuration,
-        motivationalMessage: AppState.currentQuote.text,
+        id: Date.now().toString(36),
+        mode: state.mode,
+        durationMinutes: state.duration,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        timezone: state.timezone || 'UTC',
+        motivationalMessage: state.currentQuote.text,
+        messageAuthor: state.currentQuote.author,
         status: 'completed'
     };
-    
-    AppState.sessions.push(session);
-    saveState();
-    
-    // Show completion modal
-    elements.sessionSummary.textContent = `You focused for ${session.durationMinutes} minutes`;
-    elements.modalQuote.textContent = `"${AppState.currentQuote.text}"`;
-    elements.modalQuoteAuthor.textContent = `— ${AppState.currentQuote.author}`;
-    openModal(elements.sessionCompleteModal);
-    
-    // Reset timer
-    AppState.timerRemaining = AppState.timerDuration * 60;
-    updateTimerDisplay();
+
+    state.sessions.push(session);
+    localStorage.setItem('focusflow_sessions', JSON.stringify(state.sessions));
     updateDashboard();
-}
+    showModal(session, start, end);
 
-// ============================================
-// Task Functions
-// ============================================
-function renderTasks(filter = 'all') {
-    const filteredTasks = filter === 'all' 
-        ? AppState.tasks 
-        : AppState.tasks.filter(task => task.category === filter);
-    
-    if (filteredTasks.length === 0) {
-        elements.tasksList.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">📝</div>
-                <p>No tasks yet. Add your first task!</p>
-            </div>
-        `;
-        return;
-    }
-    
-    elements.tasksList.innerHTML = filteredTasks.map(task => `
-        <div class="task-item ${task.status === 'completed' ? 'completed' : ''}" data-id="${task.id}">
-            <div class="task-checkbox" onclick="toggleTaskStatus('${task.id}')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    <polyline points="20 6 9 17 4 12"/>
-                </svg>
-            </div>
-            <div class="task-info">
-                <span class="task-title">${escapeHtml(task.title)}</span>
-                <div class="task-meta">
-                    <span class="task-category ${task.category}">${task.category}</span>
-                    <span class="task-duration">${task.duration || 25} min</span>
-                </div>
-            </div>
-            <div class="task-actions">
-                <button class="task-action-btn focus-btn" onclick="startFocusOnTask('${task.id}')" title="Start Focus">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
-                </button>
-                <button class="task-action-btn delete-btn" onclick="deleteTask('${task.id}')" title="Delete">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
-function handleTaskSubmit(e) {
-    e.preventDefault();
-    
-    const title = elements.taskTitle.value.trim();
-    const category = document.querySelector('.category-option.active').dataset.value;
-    const duration = parseInt(document.querySelector('.duration-option.active').dataset.value);
-    
-    if (!title) return;
-    
-    const task = {
-        id: generateId(),
-        title,
-        category,
-        status: 'active',
-        duration,
-        createdAt: new Date().toISOString()
-    };
-    
-    AppState.tasks.unshift(task);
-    saveState();
-    renderTasks();
-    
-    // Reset form and close modal
-    elements.taskForm.reset();
-    document.querySelectorAll('.category-option').forEach(b => b.classList.remove('active'));
-    document.querySelector('.category-option[data-value="Study"]').classList.add('active');
-    document.querySelectorAll('.duration-option').forEach(b => b.classList.remove('active'));
-    document.querySelector('.duration-option[data-value="25"]').classList.add('active');
-    closeModalHandler(elements.addTaskModal);
-    
-    showNotification('Task created successfully!');
-}
-
-function toggleTaskStatus(taskId) {
-    const task = AppState.tasks.find(t => t.id === taskId);
-    if (task) {
-        task.status = task.status === 'completed' ? 'active' : 'completed';
-        task.updatedAt = new Date().toISOString();
-        saveState();
-        renderTasks();
-        updateDashboard();
-    }
-}
-
-function deleteTask(taskId) {
-    AppState.tasks = AppState.tasks.filter(t => t.id !== taskId);
-    saveState();
-    renderTasks();
-    showNotification('Task deleted');
-}
-
-function startFocusOnTask(taskId) {
-    const task = AppState.tasks.find(t => t.id === taskId);
-    if (task) {
-        AppState.currentTask = task;
-        AppState.timerDuration = task.duration || 25;
-        AppState.timerRemaining = AppState.timerDuration * 60;
-        
-        elements.currentTaskName.textContent = task.title;
+    setTimeout(() => {
+        document.getElementById('timerRing').classList.remove('complete');
+        state.remaining = state.duration * 60;
         updateTimerDisplay();
-        navigateToPage('focusPage');
+    }, 500);
+}
+
+function setMode(mode) {
+    if (state.running) return;
+    state.mode = mode;
+    const cfg = { focus: [25, 'Focus Time'], break: [5, 'Short Break'], longbreak: [15, 'Long Break'] };
+    [state.duration, document.getElementById('timerLabel').textContent] = cfg[mode];
+    state.remaining = state.duration * 60;
+    document.querySelectorAll('.duration-btn').forEach(b => 
+        b.classList.toggle('active', +b.dataset.minutes === state.duration)
+    );
+    updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+    const m = Math.floor(state.remaining / 60);
+    const s = state.remaining % 60;
+    document.getElementById('timerDisplay').textContent = 
+        `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    const progress = (state.duration * 60 - state.remaining) / (state.duration * 60);
+    document.getElementById('progressRing').style.strokeDashoffset = 565.48 * (1 - progress);
+}
+
+function updateButtonUI() {
+    document.getElementById('playIcon').classList.toggle('hidden', state.running);
+    document.getElementById('pauseIcon').classList.toggle('hidden', !state.running);
+    document.getElementById('startPauseText').textContent = state.running ? 'Pause' : 'Start';
+    document.getElementById('startPauseBtn').classList.toggle('running', state.running);
+    document.querySelectorAll('.duration-btn').forEach(b => b.disabled = state.running);
+}
+
+// ============================================
+// Quote (ZenQuotes API)
+// ============================================
+async function fetchQuote() {
+    try {
+        const r = await fetch('https://zenquotes.io/api/random');
+        const d = await r.json();
+        if (d?.[0]) {
+            state.currentQuote = { text: d[0].q, author: d[0].a };
+            document.getElementById('quoteText').textContent = `"${d[0].q}"`;
+            document.getElementById('quoteAuthor').textContent = `— ${d[0].a}`;
+        }
+    } catch (e) {
+        console.log('Using default quote');
     }
 }
 
 // ============================================
-// Dashboard Functions
+// Navigation
+// ============================================
+function navigateTo(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(pageId)?.classList.add('active');
+    document.querySelector(`[data-page="${pageId}"]`)?.classList.add('active');
+    if (pageId === 'dashboardPage') {
+        updateDashboard();
+        updateCharts();
+    }
+}
+
+// ============================================
+// Dashboard
 // ============================================
 function updateDashboard() {
-    // Calculate stats
-    const totalSessionsCount = AppState.sessions.length;
-    const totalMinutes = AppState.sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-    const completedTasksCount = AppState.tasks.filter(t => t.status === 'completed').length;
-    const streak = calculateStreak();
+    const today = new Date().toDateString();
+    const focus = state.sessions.filter(s => s.mode === 'focus');
+    const todayS = focus.filter(s => new Date(s.startTime).toDateString() === today);
     
-    // Update stat cards
-    elements.totalSessions.textContent = totalSessionsCount;
-    elements.totalFocusTime.textContent = formatDuration(totalMinutes);
-    elements.tasksCompleted.textContent = completedTasksCount;
-    elements.currentStreak.textContent = streak;
+    document.getElementById('statTodaySessions').textContent = todayS.length;
+    document.getElementById('statTodayMinutes').textContent = todayS.reduce((a, s) => a + s.durationMinutes, 0) + 'm';
+    document.getElementById('statTotalSessions').textContent = focus.length;
+    document.getElementById('statStreak').textContent = calcStreak();
     
-    // Render recent sessions
-    renderRecentSessions();
+    renderDailyBreakdown();
+    renderSessionsList();
 }
 
-function calculateStreak() {
-    if (AppState.sessions.length === 0) return 0;
+function calcStreak() {
+    const focus = state.sessions.filter(s => s.mode === 'focus');
+    if (!focus.length) return 0;
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const sessionDates = [...new Set(
-        AppState.sessions.map(s => {
-            const date = new Date(s.startTime);
-            date.setHours(0, 0, 0, 0);
-            return date.getTime();
-        })
-    )].sort((a, b) => b - a);
+    const dates = [...new Set(focus.map(s => {
+        const d = new Date(s.startTime);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+    }))].sort((a, b) => b - a);
     
     let streak = 0;
-    let currentDate = today.getTime();
+    let check = today.getTime();
     
-    for (const date of sessionDates) {
-        if (date === currentDate || date === currentDate - 86400000) {
+    for (const d of dates) {
+        if (d === check || d === check - 86400000) {
             streak++;
-            currentDate = date;
+            check = d;
         } else {
             break;
         }
     }
-    
     return streak;
 }
 
-function formatDuration(minutes) {
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+function renderDailyBreakdown() {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay());
+    start.setHours(0, 0, 0, 0);
+    
+    const data = [];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(start);
+        date.setDate(start.getDate() + i);
+        const mins = state.sessions
+            .filter(s => s.mode === 'focus' && new Date(s.startTime).toDateString() === date.toDateString())
+            .reduce((a, s) => a + s.durationMinutes, 0);
+        data.push({ day: days[i], mins, isToday: date.toDateString() === today.toDateString() });
+    }
+    
+    const max = Math.max(...data.map(d => d.mins), 60);
+    document.getElementById('dailyBreakdown').innerHTML = data.map(d => `
+        <div class="day-column">
+            <div class="day-bar-container">
+                <div class="day-bar" style="height:${(d.mins / max) * 100}%"></div>
+            </div>
+            <span class="day-label" style="${d.isToday ? 'color:var(--text-primary);font-weight:600' : ''}">${d.day}</span>
+            <span class="day-value">${d.mins}m</span>
+        </div>
+    `).join('');
 }
 
-function renderRecentSessions() {
-    const recentSessions = AppState.sessions.slice(-5).reverse();
+function renderSessionsList() {
+    const recent = [...state.sessions].reverse().slice(0, 8);
     
-    if (recentSessions.length === 0) {
-        elements.sessionsList.innerHTML = `
+    if (!recent.length) {
+        document.getElementById('sessionsList').innerHTML = `
             <div class="empty-state">
-                <div class="empty-state-icon">⏱️</div>
-                <p>No sessions yet. Start your first focus session!</p>
+                <div class="empty-state-icon">📊</div>
+                <p>No sessions yet</p>
             </div>
         `;
         return;
     }
     
-    elements.sessionsList.innerHTML = recentSessions.map(session => {
-        const date = new Date(session.startTime);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-        
+    const icons = { focus: '🎯', break: '☕', longbreak: '🌙' };
+    document.getElementById('sessionsList').innerHTML = recent.map(s => {
+        const d = new Date(s.startTime);
         return `
             <div class="session-item">
                 <div class="session-info">
-                    <span class="session-task">${escapeHtml(session.taskTitle)}</span>
-                    <span class="session-time">${dateStr} at ${timeStr}</span>
+                    <span class="session-mode">
+                        ${icons[s.mode] || '🎯'} ${s.mode}
+                        <span class="session-badge">${s.durationMinutes}m</span>
+                    </span>
+                    <span class="session-time">
+                        ${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                    </span>
                 </div>
-                <span class="session-duration">${session.durationMinutes}m</span>
+                <span class="session-duration">${s.durationMinutes}m</span>
             </div>
         `;
     }).join('');
 }
 
 // ============================================
-// Charts
+// Charts (Chart.js)
 // ============================================
-let weeklyChart, categoryChart;
-
 function initCharts() {
-    const weeklyCtx = document.getElementById('weeklyChart');
-    const categoryCtx = document.getElementById('categoryChart');
-    
-    // Weekly Focus Time Chart
-    weeklyChart = new Chart(weeklyCtx, {
+    weeklyChart = new Chart(document.getElementById('weeklyChart'), {
         type: 'bar',
         data: {
             labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
             datasets: [{
-                label: 'Focus Time (min)',
                 data: [0, 0, 0, 0, 0, 0, 0],
-                backgroundColor: 'rgba(255, 255, 255, 0.6)',
-                borderColor: 'rgba(255, 255, 255, 0.8)',
-                borderWidth: 1,
-                borderRadius: 8,
-                borderSkipped: false,
+                backgroundColor: 'rgba(255,255,255,0.5)',
+                borderRadius: 6
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: { display: false }
-            },
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)',
-                    },
-                    ticks: {
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        font: { family: 'Nunito' }
-                    }
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                    ticks: { color: 'rgba(255,255,255,0.6)' }
                 },
                 x: {
                     grid: { display: false },
-                    ticks: {
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        font: { family: 'Nunito' }
-                    }
+                    ticks: { color: 'rgba(255,255,255,0.6)' }
                 }
             }
         }
     });
     
-    // Category Distribution Chart
-    categoryChart = new Chart(categoryCtx, {
+    modeChart = new Chart(document.getElementById('modeChart'), {
         type: 'doughnut',
         data: {
-            labels: ['Study', 'Work', 'Personal'],
+            labels: ['Focus', 'Break', 'Long'],
             datasets: [{
                 data: [0, 0, 0],
                 backgroundColor: [
-                    'rgba(130, 170, 227, 0.7)',
-                    'rgba(227, 170, 130, 0.7)',
-                    'rgba(170, 227, 130, 0.7)'
+                    'rgba(130,170,227,0.7)',
+                    'rgba(170,227,130,0.7)',
+                    'rgba(227,170,130,0.7)'
                 ],
-                borderColor: [
-                    'rgba(130, 170, 227, 1)',
-                    'rgba(227, 170, 130, 1)',
-                    'rgba(170, 227, 130, 1)'
-                ],
-                borderWidth: 2
+                borderWidth: 0
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: {
-                        color: 'rgba(255, 255, 255, 0.8)',
-                        font: { family: 'Nunito', size: 12 },
-                        padding: 16
-                    }
+                    labels: { color: 'rgba(255,255,255,0.7)', font: { size: 10 } }
                 }
             },
-            cutout: '60%'
+            cutout: '65%'
         }
     });
-    
-    updateCharts();
 }
 
 function updateCharts() {
-    // Calculate weekly data
-    const weeklyData = getWeeklyData();
-    weeklyChart.data.datasets[0].data = weeklyData;
-    weeklyChart.update();
-    
-    // Calculate category data
-    const categoryData = getCategoryData();
-    categoryChart.data.datasets[0].data = categoryData;
-    categoryChart.update();
-}
-
-function getWeeklyData() {
-    const data = [0, 0, 0, 0, 0, 0, 0];
     const today = new Date();
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
-    startOfWeek.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay() + 1);
+    start.setHours(0, 0, 0, 0);
     
-    AppState.sessions.forEach(session => {
-        const sessionDate = new Date(session.startTime);
-        if (sessionDate >= startOfWeek) {
-            const dayIndex = (sessionDate.getDay() + 6) % 7; // Convert to Mon=0
-            data[dayIndex] += session.durationMinutes;
+    const weekly = [0, 0, 0, 0, 0, 0, 0];
+    state.sessions.filter(s => s.mode === 'focus').forEach(s => {
+        const d = new Date(s.startTime);
+        if (d >= start) {
+            weekly[(d.getDay() + 6) % 7] += s.durationMinutes;
         }
     });
-    
-    return data;
-}
+    weeklyChart.data.datasets[0].data = weekly;
+    weeklyChart.update();
 
-function getCategoryData() {
-    const categories = { Study: 0, Work: 0, Personal: 0 };
-    
-    AppState.sessions.forEach(session => {
-        if (categories.hasOwnProperty(session.category)) {
-            categories[session.category] += session.durationMinutes;
+    const modes = { focus: 0, break: 0, longbreak: 0 };
+    state.sessions.forEach(s => {
+        if (modes.hasOwnProperty(s.mode)) {
+            modes[s.mode] += s.durationMinutes;
         }
     });
+    modeChart.data.datasets[0].data = [modes.focus, modes.break, modes.longbreak];
+    modeChart.update();
+}
+
+// ============================================
+// Modal
+// ============================================
+function showModal(session, start, end) {
+    document.getElementById('sessionSummary').textContent = 
+        `You ${state.mode === 'focus' ? 'focused' : 'rested'} for ${session.durationMinutes} minutes`;
+    document.getElementById('sessionTimeInfo').textContent = 
+        `${start.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} — ${end.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`;
+    document.getElementById('modalQuote').textContent = `"${state.currentQuote.text}"`;
+    document.getElementById('modalQuoteAuthor').textContent = `— ${state.currentQuote.author}`;
+    document.getElementById('sessionModal').classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('sessionModal').classList.remove('active');
+}
+
+// ============================================
+// Event Setup
+// ============================================
+function setupEvents() {
+    // Timer controls
+    document.getElementById('startPauseBtn').onclick = () => state.running ? pauseTimer() : startTimer();
+    document.getElementById('resetBtn').onclick = resetTimer;
     
-    return [categories.Study, categories.Work, categories.Personal];
-}
-
-// ============================================
-// API Functions
-// ============================================
-async function fetchRandomQuote() {
-    try {
-        const response = await fetch('https://zenquotes.io/api/random');
-        const data = await response.json();
-        
-        if (data && data[0]) {
-            AppState.currentQuote = {
-                text: data[0].q,
-                author: data[0].a
-            };
-            
-            // Update quote displays
-            elements.quoteText.textContent = `"${AppState.currentQuote.text}"`;
-            elements.quoteAuthor.textContent = `— ${AppState.currentQuote.author}`;
-        }
-    } catch (error) {
-        console.log('Using default quote');
-        // Keep existing quote on error
-    }
-}
-
-async function getCurrentTime() {
-    try {
-        const response = await fetch('http://worldtimeapi.org/api/ip');
-        const data = await response.json();
-        return new Date(data.datetime);
-    } catch (error) {
-        return new Date();
-    }
-}
-
-// ============================================
-// UI Helpers
-// ============================================
-function updateGreeting() {
-    const hour = new Date().getHours();
-    let greeting = 'Hello';
+    // Duration buttons
+    document.querySelectorAll('.duration-btn').forEach(b => {
+        b.onclick = () => {
+            if (state.running) return;
+            document.querySelectorAll('.duration-btn').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            state.duration = +b.dataset.minutes;
+            state.remaining = state.duration * 60;
+            updateTimerDisplay();
+        };
+    });
     
-    if (hour >= 5 && hour < 12) greeting = 'Morning';
-    else if (hour >= 12 && hour < 17) greeting = 'Afternoon';
-    else if (hour >= 17 && hour < 21) greeting = 'Evening';
-    else greeting = 'Night';
+    // Mode cards
+    document.querySelectorAll('.mode-card').forEach(c => {
+        c.onclick = () => {
+            if (state.running) return;
+            document.querySelectorAll('.mode-card').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            setMode(c.dataset.mode);
+        };
+    });
     
-    elements.greeting.textContent = greeting;
+    // Navigation
+    document.querySelectorAll('.nav-btn').forEach(b => {
+        b.onclick = () => navigateTo(b.dataset.page);
+    });
+    
+    // Modal
+    document.getElementById('closeModalBtn').onclick = closeModal;
+    document.getElementById('sessionModal').onclick = e => {
+        if (e.target.id === 'sessionModal') closeModal();
+    };
+
+    // Ambient Panel
+    document.getElementById('ambientTrigger').onclick = toggleAmbientPanel;
+    document.getElementById('ambientPanel').onclick = e => e.stopPropagation();
+    document.addEventListener('click', closeAmbientPanel);
+    
+    // Ambient options
+    document.querySelectorAll('.ambient-option').forEach(c => {
+        c.onclick = (e) => {
+            e.stopPropagation();
+            document.querySelectorAll('.ambient-option').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            setTheme(c.dataset.theme);
+            playSound(c.dataset.sound);
+        };
+    });
+    
+    // Volume slider
+    document.getElementById('volumeSlider').oninput = e => {
+        state.volume = e.target.value / 100;
+        if (state.audio) state.audio.volume = state.volume;
+        localStorage.setItem('focusflow_volume', state.volume);
+    };
 }
 
-function updateDayIndicator() {
-    const today = new Date().getDay();
-    document.querySelectorAll('.week-indicator .day').forEach(day => {
-        day.classList.remove('active');
-        if (parseInt(day.dataset.day) === today) {
-            day.classList.add('active');
+// ============================================
+// Initialize Application
+// ============================================
+async function init() {
+    // Generate visual effects
+    generateEffects();
+    
+    // Set initial theme
+    setTheme(state.currentTheme);
+    document.getElementById('volumeSlider').value = state.volume * 100;
+    
+    // Set initial active state for ambient options
+    document.querySelectorAll('.ambient-option').forEach(c => {
+        if (c.dataset.theme === state.currentTheme && c.dataset.sound === 'none') {
+            c.classList.add('active');
+            document.getElementById('ambientIcon').textContent = c.querySelector('.ambient-option-icon').textContent;
+            document.getElementById('ambientLabel').textContent = c.querySelector('.ambient-option-label').textContent;
+        } else {
+            c.classList.remove('active');
         }
     });
+
+    // Fetch world time
+    await fetchWorldTime();
+    updateGreeting();
+    updateDayIndicator();
+    updateTimerDisplay();
+    
+    // Fetch quote
+    fetchQuote();
+    
+    // Initialize charts
+    initCharts();
+    updateDashboard();
+    
+    // Setup event listeners
+    setupEvents();
+
+    // Start time updates
+    setInterval(() => {
+        if (state.worldTime) {
+            state.worldTime = new Date(state.worldTime.getTime() + 1000);
+        }
+        updateTimeDisplay();
+    }, 1000);
+    
+    setInterval(fetchWorldTime, 5 * 60 * 1000);
+    setInterval(updateGreeting, 60000);
 }
 
-function openModal(modal) {
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeModalHandler(modal) {
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-function showNotification(message) {
-    // Simple notification - could be enhanced with a toast component
-    console.log(message);
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// ============================================
-// Initialize App
-// ============================================
+// Start the application
 document.addEventListener('DOMContentLoaded', init);
-
-// Expose functions to global scope for inline event handlers
-window.toggleTaskStatus = toggleTaskStatus;
-window.deleteTask = deleteTask;
-window.startFocusOnTask = startFocusOnTask;
