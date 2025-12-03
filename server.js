@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -19,6 +21,8 @@ mongoose.connect(MONGODB_URI)
 
 const sessionSchema = new mongoose.Schema({
     mode: { type: String, enum: ['focus', 'break', 'longbreak'], default: 'focus' },
+    label: { type: String, default: '' },
+    labelIcon: { type: String, default: '📌' },
     durationMinutes: { type: Number, required: true },
     startTime: { type: Date, required: true },
     endTime: { type: Date, required: true },
@@ -49,6 +53,8 @@ app.post('/api/sessions', async (req, res) => {
     try {
         const session = new Session({
             mode: req.body.mode,
+            label: req.body.label || '',
+            labelIcon: req.body.labelIcon || '📌',
             durationMinutes: req.body.durationMinutes,
             startTime: new Date(req.body.startTime),
             endTime: new Date(req.body.endTime),
@@ -58,7 +64,7 @@ app.post('/api/sessions', async (req, res) => {
             status: req.body.status
         });
         await session.save();
-        console.log('✅ Session saved:', session._id);
+        console.log('✅ Session saved:', session._id, '| Label:', session.label);
         res.status(201).json({ success: true, session });
     } catch (error) {
         console.error('❌ Save error:', error);
@@ -140,6 +146,30 @@ app.get('/api/health', (req, res) => {
         mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
         timestamp: new Date().toISOString()
     });
+});
+
+// Quote proxy (to avoid CORS issues)
+app.get('/api/quote', async (req, res) => {
+    try {
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch('https://zenquotes.io/api/random');
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        // Fallback quotes
+        const fallbackQuotes = [
+            { q: "The secret of getting ahead is getting started.", a: "Mark Twain" },
+            { q: "Focus on being productive instead of busy.", a: "Tim Ferriss" },
+            { q: "The way to get started is to quit talking and begin doing.", a: "Walt Disney" },
+            { q: "Don't watch the clock; do what it does. Keep going.", a: "Sam Levenson" },
+            { q: "It's not about having time, it's about making time.", a: "Unknown" },
+            { q: "Start where you are. Use what you have. Do what you can.", a: "Arthur Ashe" },
+            { q: "The only way to do great work is to love what you do.", a: "Steve Jobs" },
+            { q: "Success is the sum of small efforts repeated day in and day out.", a: "Robert Collier" }
+        ];
+        const randomQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+        res.json([randomQuote]);
+    }
 });
 
 // Serve frontend

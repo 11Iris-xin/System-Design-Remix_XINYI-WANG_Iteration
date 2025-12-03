@@ -473,3 +473,131 @@ body.theme-ocean .ocean-waves { background: linear-gradient(180deg, transparent 
     .timer-ring { width: 220px; height: 220px; }
     .timer-time { font-size: 3rem; }
 }
+/* ============================================
+   Label Selector Styles
+   ============================================ */
+.label-selector {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.label-title {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
+    text-align: center;
+}
+
+.label-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    justify-content: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.label-btn {
+    padding: 8px 14px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-family: 'Nunito', sans-serif;
+}
+
+.label-btn:hover {
+    background: rgba(255,255,255,0.2);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.label-btn.active {
+    background: rgba(130,170,227,0.4);
+    border-color: rgba(130,170,227,0.6);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.custom-label-row {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+}
+
+.custom-label-input {
+    flex: 1;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: 'Nunito', sans-serif;
+    outline: none;
+    transition: var(--transition-fast);
+}
+
+.custom-label-input::placeholder {
+    color: var(--text-muted);
+}
+
+.custom-label-input:focus {
+    border-color: rgba(130,170,227,0.6);
+    background: rgba(255,255,255,0.15);
+}
+
+.custom-label-add {
+    width: 40px;
+    height: 40px;
+    background: rgba(130,170,227,0.4);
+    border: 1px solid rgba(130,170,227,0.6);
+    border-radius: 50%;
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.custom-label-add:hover {
+    background: rgba(130,170,227,0.6);
+    transform: scale(1.05);
+}
+
+.current-label {
+    text-align: center;
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+#currentLabelDisplay {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.label-selector.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.session-label-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(130,170,227,0.3);
+    border-radius: 10px;
+    font-size: 0.7rem;
+    margin-left: 6px;
+    color: var(--text-primary);
+}

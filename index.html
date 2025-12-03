@@ -133,6 +133,26 @@
                         <button class="duration-btn" data-minutes="60">60m</button>
                     </div>
 
+                    <!-- Label Selector -->
+                    <div class="label-selector" id="labelSelector">
+                        <div class="label-title">📌 What are you working on?</div>
+                        <div class="label-options">
+                            <button class="label-btn active" data-label="Study">📚 Study</button>
+                            <button class="label-btn" data-label="Work">💼 Work</button>
+                            <button class="label-btn" data-label="Exercise">🏃 Exercise</button>
+                            <button class="label-btn" data-label="Reading">📖 Reading</button>
+                            <button class="label-btn" data-label="Creative">🎨 Creative</button>
+                            <button class="label-btn" data-label="Other">✨ Other</button>
+                        </div>
+                        <div class="custom-label-row">
+                            <input type="text" id="customLabelInput" class="custom-label-input" placeholder="Or type custom label..." maxlength="20">
+                            <button class="custom-label-add" id="addCustomLabel">+</button>
+                        </div>
+                        <div class="current-label">
+                            Current: <span id="currentLabelDisplay">📚 Study</span>
+                        </div>
+                    </div>
+
                     <!-- Timer Controls -->
                     <div class="timer-controls">
                         <button class="control-btn secondary" id="resetBtn">

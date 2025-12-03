@@ -1,6 +1,10 @@
 // ============================================
 // Focus Flow - Application JavaScript
+// With MongoDB API Integration
 // ============================================
+
+// API Configuration
+const API_BASE = '/api';
 
 // Ambient Sound URLs
 const SOUNDS = {
@@ -21,25 +25,171 @@ const state = {
     running: false,
     interval: null,
     mode: 'focus',
+    currentLabel: localStorage.getItem('focusflow_label') || 'Study',
+    currentLabelIcon: '📚',
     sessionStartTime: null,
     worldTime: null,
     timezone: null,
     currentQuote: { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
     sessions: JSON.parse(localStorage.getItem('focusflow_sessions') || '[]'),
+    pendingSync: JSON.parse(localStorage.getItem('focusflow_pending') || '[]'),
     currentTheme: localStorage.getItem('focusflow_theme') || 'default',
     currentSound: 'none',
     audio: null,
     volume: parseFloat(localStorage.getItem('focusflow_volume') || '0.5'),
-    isPlaying: false
+    isPlaying: false,
+    isOnline: navigator.onLine,
+    backendAvailable: false
 };
 
 let weeklyChart, modeChart;
 
 // ============================================
+// MongoDB API Functions
+// ============================================
+async function checkBackend() {
+    try {
+        const response = await fetch(`${API_BASE}/health`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.mongodb === 'connected') {
+                state.backendAvailable = true;
+                console.log('✅ MongoDB connected');
+                updateSyncStatus('synced');
+                return true;
+            }
+        }
+    } catch (error) {
+        console.log('⚠️ Backend unavailable:', error.message);
+    }
+    state.backendAvailable = false;
+    updateSyncStatus('offline');
+    return false;
+}
+
+async function saveSessionToAPI(session) {
+    if (!state.backendAvailable) {
+        console.log('📦 Saving to pending queue (offline)');
+        state.pendingSync.push(session);
+        localStorage.setItem('focusflow_pending', JSON.stringify(state.pendingSync));
+        return false;
+    }
+    
+    try {
+        console.log('📤 Saving session to MongoDB...');
+        const response = await fetch(`${API_BASE}/sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(session)
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Session saved to MongoDB:', data.session._id);
+            updateSyncStatus('synced');
+            return true;
+        } else {
+            throw new Error('API returned error');
+        }
+    } catch (error) {
+        console.error('❌ MongoDB save failed:', error);
+        state.pendingSync.push(session);
+        localStorage.setItem('focusflow_pending', JSON.stringify(state.pendingSync));
+        updateSyncStatus('offline');
+        return false;
+    }
+}
+
+async function fetchStatsFromAPI() {
+    if (!state.backendAvailable) return null;
+    
+    try {
+        const response = await fetch(`${API_BASE}/stats`);
+        if (response.ok) {
+            const data = await response.json();
+            console.log('📊 Stats from MongoDB:', data);
+            return data;
+        }
+    } catch (error) {
+        console.error('Failed to fetch stats:', error);
+    }
+    return null;
+}
+
+async function fetchSessionsFromAPI() {
+    if (!state.backendAvailable) return null;
+    
+    try {
+        const response = await fetch(`${API_BASE}/sessions?limit=50`);
+        if (response.ok) {
+            const data = await response.json();
+            console.log('📋 Sessions from MongoDB:', data.count);
+            return data.sessions;
+        }
+    } catch (error) {
+        console.error('Failed to fetch sessions:', error);
+    }
+    return null;
+}
+
+async function syncPendingSessions() {
+    if (state.pendingSync.length === 0) return;
+    if (!state.backendAvailable) return;
+    
+    console.log(`🔄 Syncing ${state.pendingSync.length} pending sessions...`);
+    updateSyncStatus('syncing');
+    
+    const pending = [...state.pendingSync];
+    state.pendingSync = [];
+    
+    let successCount = 0;
+    for (const session of pending) {
+        try {
+            const response = await fetch(`${API_BASE}/sessions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(session)
+            });
+            
+            if (response.ok) {
+                successCount++;
+            } else {
+                state.pendingSync.push(session);
+            }
+        } catch {
+            state.pendingSync.push(session);
+        }
+    }
+    
+    localStorage.setItem('focusflow_pending', JSON.stringify(state.pendingSync));
+    updateSyncStatus(state.pendingSync.length === 0 ? 'synced' : 'offline');
+    console.log(`✅ Synced ${successCount}/${pending.length} sessions`);
+}
+
+function updateSyncStatus(status) {
+    const dot = document.getElementById('syncDot');
+    const text = document.getElementById('syncText');
+    
+    switch (status) {
+        case 'synced':
+            dot.style.background = '#4ade80';
+            text.textContent = 'Synced';
+            break;
+        case 'syncing':
+            dot.style.background = '#fbbf24';
+            text.textContent = 'Syncing...';
+            break;
+        case 'offline':
+            dot.style.background = '#f87171';
+            text.textContent = 'Local';
+            break;
+    }
+}
+
+// ============================================
 // Ambient Effects
 // ============================================
 function generateEffects() {
-    // Rain drops
     const rain = document.getElementById('rainContainer');
     for (let i = 0; i < 100; i++) {
         const drop = document.createElement('div');
@@ -50,7 +200,6 @@ function generateEffects() {
         rain.appendChild(drop);
     }
     
-    // Stars
     const stars = document.getElementById('starsContainer');
     for (let i = 0; i < 50; i++) {
         const star = document.createElement('div');
@@ -61,7 +210,6 @@ function generateEffects() {
         stars.appendChild(star);
     }
     
-    // Fireflies
     const fireflies = document.getElementById('firefliesContainer');
     for (let i = 0; i < 15; i++) {
         const fly = document.createElement('div');
@@ -72,7 +220,6 @@ function generateEffects() {
         fireflies.appendChild(fly);
     }
     
-    // Fire sparks
     const sparks = document.getElementById('sparksContainer');
     for (let i = 0; i < 20; i++) {
         const spark = document.createElement('div');
@@ -99,7 +246,6 @@ function playSound(key) {
     }
     state.currentSound = key;
     
-    // Update trigger button display
     const activeOption = document.querySelector(`.ambient-option[data-sound="${key}"]`);
     if (activeOption) {
         document.getElementById('ambientIcon').textContent = activeOption.querySelector('.ambient-option-icon').textContent;
@@ -125,8 +271,7 @@ function playSound(key) {
 
 function toggleAmbientPanel(e) {
     e.stopPropagation();
-    const panel = document.getElementById('ambientPanel');
-    panel.classList.toggle('open');
+    document.getElementById('ambientPanel').classList.toggle('open');
 }
 
 function closeAmbientPanel() {
@@ -178,7 +323,7 @@ function updateDayIndicator() {
 // ============================================
 function startTimer() {
     state.running = true;
-    state.sessionStartTime = state.worldTime || new Date();
+    state.sessionStartTime = new Date(state.worldTime || new Date());
     updateButtonUI();
     state.interval = setInterval(() => {
         if (state.remaining > 0) {
@@ -207,14 +352,20 @@ function resetTimer() {
 async function completeSession() {
     pauseTimer();
     document.getElementById('timerRing').classList.add('complete');
+    
+    // Update world time
     await fetchWorldTime();
-    const end = state.worldTime || new Date();
-    const start = state.sessionStartTime || new Date(end - state.duration * 60000);
+    const end = new Date(state.worldTime || new Date());
+    const start = state.sessionStartTime || new Date(end.getTime() - state.duration * 60000);
+    
+    // Fetch new quote
     await fetchQuote();
 
+    // Create session object
     const session = {
-        id: Date.now().toString(36),
         mode: state.mode,
+        label: state.currentLabel,
+        labelIcon: state.currentLabelIcon,
         durationMinutes: state.duration,
         startTime: start.toISOString(),
         endTime: end.toISOString(),
@@ -224,11 +375,18 @@ async function completeSession() {
         status: 'completed'
     };
 
+    // Save to localStorage (always, as backup)
     state.sessions.push(session);
     localStorage.setItem('focusflow_sessions', JSON.stringify(state.sessions));
-    updateDashboard();
+    
+    // Save to MongoDB
+    await saveSessionToAPI(session);
+    
+    // Update UI
+    await updateDashboard();
     showModal(session, start, end);
 
+    // Reset timer after delay
     setTimeout(() => {
         document.getElementById('timerRing').classList.remove('complete');
         state.remaining = state.duration * 60;
@@ -263,22 +421,47 @@ function updateButtonUI() {
     document.getElementById('startPauseText').textContent = state.running ? 'Pause' : 'Start';
     document.getElementById('startPauseBtn').classList.toggle('running', state.running);
     document.querySelectorAll('.duration-btn').forEach(b => b.disabled = state.running);
+    // Disable label selector when running
+    document.getElementById('labelSelector')?.classList.toggle('disabled', state.running);
 }
 
 // ============================================
-// Quote (ZenQuotes API)
+// Quote (via backend proxy to avoid CORS)
 // ============================================
 async function fetchQuote() {
     try {
-        const r = await fetch('https://zenquotes.io/api/random');
-        const d = await r.json();
-        if (d?.[0]) {
-            state.currentQuote = { text: d[0].q, author: d[0].a };
-            document.getElementById('quoteText').textContent = `"${d[0].q}"`;
-            document.getElementById('quoteAuthor').textContent = `— ${d[0].a}`;
+        // 先尝试通过后端代理获取
+        let response = await fetch(`${API_BASE}/quote`);
+        
+        // 如果后端不可用，尝试直接访问（可能会有 CORS 问题）
+        if (!response.ok) {
+            response = await fetch('https://zenquotes.io/api/random');
+        }
+        
+        const data = await response.json();
+        if (data?.[0]) {
+            state.currentQuote = { text: data[0].q, author: data[0].a };
+            document.getElementById('quoteText').textContent = `"${data[0].q}"`;
+            document.getElementById('quoteAuthor').textContent = `— ${data[0].a}`;
+            console.log('📜 New quote loaded');
         }
     } catch (e) {
-        console.log('Using default quote');
+        console.log('Using fallback quote');
+        // 使用本地备用 quotes
+        const fallbackQuotes = [
+            { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+            { text: "Focus on being productive instead of busy.", author: "Tim Ferriss" },
+            { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney" },
+            { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+            { text: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
+            { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+            { text: "Success is the sum of small efforts repeated day in and day out.", author: "Robert Collier" },
+            { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" }
+        ];
+        const randomQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+        state.currentQuote = randomQuote;
+        document.getElementById('quoteText').textContent = `"${randomQuote.text}"`;
+        document.getElementById('quoteAuthor').textContent = `— ${randomQuote.author}`;
     }
 }
 
@@ -299,21 +482,40 @@ function navigateTo(pageId) {
 // ============================================
 // Dashboard
 // ============================================
-function updateDashboard() {
-    const today = new Date().toDateString();
-    const focus = state.sessions.filter(s => s.mode === 'focus');
-    const todayS = focus.filter(s => new Date(s.startTime).toDateString() === today);
+async function updateDashboard() {
+    // Try MongoDB first
+    const apiStats = await fetchStatsFromAPI();
     
-    document.getElementById('statTodaySessions').textContent = todayS.length;
-    document.getElementById('statTodayMinutes').textContent = todayS.reduce((a, s) => a + s.durationMinutes, 0) + 'm';
-    document.getElementById('statTotalSessions').textContent = focus.length;
-    document.getElementById('statStreak').textContent = calcStreak();
+    if (apiStats && apiStats.success) {
+        // Use MongoDB data
+        document.getElementById('statTodaySessions').textContent = apiStats.todaySessions || 0;
+        document.getElementById('statTodayMinutes').textContent = (apiStats.todayMinutes || 0) + 'm';
+        document.getElementById('statTotalSessions').textContent = apiStats.totalSessions || 0;
+        document.getElementById('statStreak').textContent = apiStats.streak || 0;
+        
+        // Get sessions for charts
+        const sessions = await fetchSessionsFromAPI();
+        if (sessions && sessions.length > 0) {
+            state.sessions = sessions;
+            localStorage.setItem('focusflow_sessions', JSON.stringify(sessions));
+        }
+    } else {
+        // Fallback to localStorage
+        const today = new Date().toDateString();
+        const focus = state.sessions.filter(s => s.mode === 'focus');
+        const todayS = focus.filter(s => new Date(s.startTime).toDateString() === today);
+        
+        document.getElementById('statTodaySessions').textContent = todayS.length;
+        document.getElementById('statTodayMinutes').textContent = todayS.reduce((a, s) => a + s.durationMinutes, 0) + 'm';
+        document.getElementById('statTotalSessions').textContent = focus.length;
+        document.getElementById('statStreak').textContent = calcLocalStreak();
+    }
     
     renderDailyBreakdown();
     renderSessionsList();
 }
 
-function calcStreak() {
+function calcLocalStreak() {
     const focus = state.sessions.filter(s => s.mode === 'focus');
     if (!focus.length) return 0;
     
@@ -385,12 +587,14 @@ function renderSessionsList() {
     const icons = { focus: '🎯', break: '☕', longbreak: '🌙' };
     document.getElementById('sessionsList').innerHTML = recent.map(s => {
         const d = new Date(s.startTime);
+        const labelDisplay = s.label ? `<span class="session-label-badge">${s.labelIcon || '📌'} ${s.label}</span>` : '';
         return `
             <div class="session-item">
                 <div class="session-info">
                     <span class="session-mode">
                         ${icons[s.mode] || '🎯'} ${s.mode}
                         <span class="session-badge">${s.durationMinutes}m</span>
+                        ${labelDisplay}
                     </span>
                     <span class="session-time">
                         ${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
@@ -509,11 +713,9 @@ function closeModal() {
 // Event Setup
 // ============================================
 function setupEvents() {
-    // Timer controls
     document.getElementById('startPauseBtn').onclick = () => state.running ? pauseTimer() : startTimer();
     document.getElementById('resetBtn').onclick = resetTimer;
     
-    // Duration buttons
     document.querySelectorAll('.duration-btn').forEach(b => {
         b.onclick = () => {
             if (state.running) return;
@@ -525,7 +727,6 @@ function setupEvents() {
         };
     });
     
-    // Mode cards
     document.querySelectorAll('.mode-card').forEach(c => {
         c.onclick = () => {
             if (state.running) return;
@@ -535,23 +736,19 @@ function setupEvents() {
         };
     });
     
-    // Navigation
     document.querySelectorAll('.nav-btn').forEach(b => {
         b.onclick = () => navigateTo(b.dataset.page);
     });
     
-    // Modal
     document.getElementById('closeModalBtn').onclick = closeModal;
     document.getElementById('sessionModal').onclick = e => {
         if (e.target.id === 'sessionModal') closeModal();
     };
 
-    // Ambient Panel
     document.getElementById('ambientTrigger').onclick = toggleAmbientPanel;
     document.getElementById('ambientPanel').onclick = e => e.stopPropagation();
     document.addEventListener('click', closeAmbientPanel);
     
-    // Ambient options
     document.querySelectorAll('.ambient-option').forEach(c => {
         c.onclick = (e) => {
             e.stopPropagation();
@@ -562,26 +759,71 @@ function setupEvents() {
         };
     });
     
-    // Volume slider
     document.getElementById('volumeSlider').oninput = e => {
         state.volume = e.target.value / 100;
         if (state.audio) state.audio.volume = state.volume;
         localStorage.setItem('focusflow_volume', state.volume);
     };
+    
+    // Label selector events
+    document.querySelectorAll('.label-btn').forEach(btn => {
+        btn.onclick = () => {
+            if (state.running) return;
+            document.querySelectorAll('.label-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.currentLabel = btn.dataset.label;
+            state.currentLabelIcon = btn.textContent.trim().split(' ')[0]; // Get emoji
+            document.getElementById('currentLabelDisplay').textContent = btn.textContent.trim();
+            document.getElementById('customLabelInput').value = '';
+            localStorage.setItem('focusflow_label', state.currentLabel);
+        };
+    });
+    
+    // Custom label input
+    document.getElementById('addCustomLabel').onclick = () => {
+        const input = document.getElementById('customLabelInput');
+        const value = input.value.trim();
+        if (value && !state.running) {
+            document.querySelectorAll('.label-btn').forEach(b => b.classList.remove('active'));
+            state.currentLabel = value;
+            state.currentLabelIcon = '🏷️';
+            document.getElementById('currentLabelDisplay').textContent = `🏷️ ${value}`;
+            localStorage.setItem('focusflow_label', value);
+        }
+    };
+    
+    document.getElementById('customLabelInput').onkeypress = e => {
+        if (e.key === 'Enter') {
+            document.getElementById('addCustomLabel').click();
+        }
+    };
+    
+    // Online/Offline detection
+    window.addEventListener('online', async () => {
+        console.log('🌐 Online');
+        state.isOnline = true;
+        await checkBackend();
+        await syncPendingSessions();
+    });
+    
+    window.addEventListener('offline', () => {
+        console.log('📴 Offline');
+        state.isOnline = false;
+        state.backendAvailable = false;
+        updateSyncStatus('offline');
+    });
 }
 
 // ============================================
 // Initialize Application
 // ============================================
 async function init() {
-    // Generate visual effects
-    generateEffects();
+    console.log('🚀 Focus Flow starting...');
     
-    // Set initial theme
+    generateEffects();
     setTheme(state.currentTheme);
     document.getElementById('volumeSlider').value = state.volume * 100;
     
-    // Set initial active state for ambient options
     document.querySelectorAll('.ambient-option').forEach(c => {
         if (c.dataset.theme === state.currentTheme && c.dataset.sound === 'none') {
             c.classList.add('active');
@@ -592,23 +834,25 @@ async function init() {
         }
     });
 
-    // Fetch world time
+    // Check backend connection
+    console.log('🔌 Checking backend...');
+    await checkBackend();
+    
+    // Sync pending sessions
+    if (state.backendAvailable && state.pendingSync.length > 0) {
+        await syncPendingSessions();
+    }
+
     await fetchWorldTime();
     updateGreeting();
     updateDayIndicator();
     updateTimerDisplay();
-    
-    // Fetch quote
     fetchQuote();
-    
-    // Initialize charts
     initCharts();
-    updateDashboard();
-    
-    // Setup event listeners
+    await updateDashboard();
     setupEvents();
 
-    // Start time updates
+    // Time update interval
     setInterval(() => {
         if (state.worldTime) {
             state.worldTime = new Date(state.worldTime.getTime() + 1000);
@@ -618,7 +862,18 @@ async function init() {
     
     setInterval(fetchWorldTime, 5 * 60 * 1000);
     setInterval(updateGreeting, 60000);
+    
+    // Periodic backend check
+    setInterval(async () => {
+        if (state.isOnline && !state.backendAvailable) {
+            await checkBackend();
+            if (state.backendAvailable) {
+                await syncPendingSessions();
+            }
+        }
+    }, 30000);
+    
+    console.log('✅ Focus Flow ready!');
 }
 
-// Start the application
 document.addEventListener('DOMContentLoaded', init);
