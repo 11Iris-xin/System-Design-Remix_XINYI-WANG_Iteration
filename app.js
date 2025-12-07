@@ -1,12 +1,6 @@
-// ============================================
-// Focus Flow - Application JavaScript
-// With MongoDB API Integration
-// ============================================
 
-// API Configuration
 const API_BASE = '/api';
 
-// Ambient Sound URLs
 const SOUNDS = {
     none: null,
     rain: 'https://cdn.pixabay.com/audio/2022/05/16/audio_1b71c9e9a0.mp3',
@@ -18,7 +12,6 @@ const SOUNDS = {
     lofi: 'https://cdn.pixabay.com/audio/2022/11/22/audio_733b3d71ce.mp3'
 };
 
-// Application State
 const state = {
     duration: 25,
     remaining: 25 * 60,
@@ -44,9 +37,6 @@ const state = {
 
 let weeklyChart, modeChart;
 
-// ============================================
-// MongoDB API Functions
-// ============================================
 async function checkBackend() {
     try {
         const response = await fetch(`${API_BASE}/health`);
@@ -186,9 +176,6 @@ function updateSyncStatus(status) {
     }
 }
 
-// ============================================
-// Ambient Effects
-// ============================================
 function generateEffects() {
     const rain = document.getElementById('rainContainer');
     for (let i = 0; i < 100; i++) {
